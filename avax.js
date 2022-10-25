@@ -1,20 +1,25 @@
 /*
-- Avax Kingdom - 
+- Kingdom Cash - 
 For automatic daily claims!  
-URL: https://www.avaxkingdom.xyz/?p=0xaB951EC23283eE00AE0A575B89dDF40Df28e23Ab
+
+URLs: 
+https://www.avaxkingdom.xyz/?p=0xaB951EC23283eE00AE0A575B89dDF40Df28e23Ab
+https://www.optkingdom.xyz/?p=0xaB951EC23283eE00AE0A575B89dDF40Df28e23Ab
+https://www.matickingdom.xyz/?p=0xaB951EC23283eE00AE0A575B89dDF40Df28e23Ab
+
+
 */
 
 // Import required node modules
-const scheduler = require("node-schedule");
 const { ethers, BigNumber } = require("ethers");
+const scheduler = require("node-schedule");
+const nodemailer = require("nodemailer");
 const figlet = require("figlet");
 const ABI = require("./abi");
 require("dotenv").config();
 const fs = require("fs");
 
-// Import the environment variables
-const VAULT = process.env.CONTRACT_ADR;
-const RPC_URL = process.env.AVAX_RPC;
+// Import wallet
 const wallet = {
   address: process.env["ADR"],
   key: process.env["PVK"],
@@ -55,14 +60,32 @@ const main = async () => {
   if (!claimExists) GoldClaim();
 };
 
+// Import chain detail
+const initNetworks = (n) => {
+  let networks = [];
+  for (let i = 1; i <= n; i++) {
+    const chain = {
+      index: i,
+      rpc: process.env["RPC_" + i],
+      contract: process.env["CONTRACT_" + i],
+    };
+    networks.push(chain);
+  }
+  return networks;
+};
+
 // Ethers connect on each wallet
-const connect = async (wallet) => {
+const connect = async (network) => {
   let connection = {};
 
   // Add connection properties
-  connection.provider = new ethers.providers.JsonRpcProvider(RPC_URL);
+  connection.provider = new ethers.providers.JsonRpcProvider(network.rpc);
   connection.wallet = new ethers.Wallet(wallet.key, connection.provider);
-  connection.contract = new ethers.Contract(VAULT, ABI, connection.wallet);
+  connection.contract = new ethers.Contract(
+    network.contract,
+    ABI,
+    connection.wallet
+  );
 
   // connection established
   await connection.provider.getBalance(wallet.address);
@@ -74,7 +97,7 @@ const GoldClaim = async () => {
   // start function
   console.log("\n");
   console.log(
-    figlet.textSync("AvaxKingdom", {
+    figlet.textSync("KingdomCash", {
       font: "Standard",
       horizontalLayout: "default",
       verticalLayout: "default",
@@ -87,25 +110,63 @@ const GoldClaim = async () => {
   claims.previousClaim = new Date().toString();
   scheduleNext(new Date());
 
-  // start
-  try {
-    // claim - 3 tries on fail
-    const gold = await claimRewards(1);
+  // get network detail from .env
+  const networks = initNetworks(4);
 
-    // withdraw claimed amount
-    return withdrawGold(gold);
-  } catch (error) {
-    console.log(`Daily claim failed!`);
-    console.error(error);
+  // storage array for sending reports
+  let report = ["Kingdom Report " + todayDate()];
+
+  // loop through for each chain
+  for (const chain of networks) {
+    // start
+    try {
+      // connect to the current chain
+      const connection = connect(chain);
+
+      // claim and withdraw out rewards
+      const gold = await claimRewards(1, connection);
+      const result = await withdrawGold(gold, connection);
+
+      // get user wallet current balance
+      const b = await connection.provider.getBalance(wallet.address);
+      const balance = ethers.utils.formatEther(b);
+
+      // check contract balance amount
+      const c = await connection.provider.getBalance(chain.contract);
+      const tvl = ethers.utils.formatEther(c);
+
+      // succeeded
+      const success = {
+        index: chain.index,
+        claimed: gold.toString(),
+        withdrawn: result,
+        balance: balance,
+        contract_tvl: tvl,
+      };
+
+      report.push(success);
+    } catch (error) {
+      console.log(`Daily claim failed!`);
+      console.error(error);
+
+      // failed
+      const fail = {
+        index: chain.index,
+        claimed: false,
+      };
+
+      report.push(fail);
+    }
   }
+
+  // report status daily
+  report.push(claims);
+  sendReport(report);
 };
 
 // Withdraw Function
-const withdrawGold = async (gold) => {
+const withdrawGold = async (gold, connection) => {
   console.log("Withdrawing Funds...");
-
-  // initialize blockchain connections
-  const connection = await connect(wallet);
   await delay();
 
   // fetch if amount didn't come through
@@ -114,8 +175,7 @@ const withdrawGold = async (gold) => {
     gold = BigNumber.from(t.money);
   }
 
-  try
-  {
+  try {
     // execute the withdrawal transaction
     const w = await connection.contract.withdrawMoney(gold);
     const receipt = await w.wait();
@@ -139,17 +199,12 @@ const withdrawGold = async (gold) => {
 };
 
 // Claims Function
-const claimRewards = async (tries) => {
+const claimRewards = async (tries, connection) => {
   try {
     // limit to maximum 3 tries
     if (tries > 3) return false;
     console.log(`Try #${tries}...`);
     console.log("Claiming Rewards...");
-
-    // initialize blockchain connections
-    const connection = await connect(wallet);
-
-    // apply delay
     await delay();
 
     // execute the claiming transaction
@@ -205,7 +260,7 @@ const storeData = async () => {
 
 // Random Time Delay Function
 const delay = () => {
-  const ms = getRandomNum(196418, 317811);
+  const ms = getRandomNum(75025, 196418);
   console.log(`delay(${ms})`);
   return new Promise((resolve) => setTimeout(resolve, ms));
 };
@@ -218,6 +273,48 @@ const getRandomNum = (min, max) => {
     console.error(error);
   }
   return max;
+};
+
+// Current Date function
+const todayDate = () => {
+  const today = new Date();
+  const dd = String(today.getDate()).padStart(2, "0");
+  const mm = String(today.getMonth() + 1).padStart(2, "0");
+  const yyyy = today.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
+};
+
+// Send Report Function
+const sendReport = async (report) => {
+  // get the formatted date
+  const today = todayDate();
+  console.log(report);
+
+  // configure email server
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: process.env.EMAIL_ADDR,
+      pass: process.env.EMAIL_PW,
+    },
+  });
+
+  // setup mail params
+  const mailOptions = {
+    from: process.env.EMAIL_ADDR,
+    to: process.env.RECIPIENT,
+    subject: "Kingdom Report: " + today,
+    text: JSON.stringify(report, null, 2),
+  };
+
+  // send the email message
+  transporter.sendMail(mailOptions, (error, info) => {
+    if (error) {
+      console.log(error);
+    } else {
+      console.log("Email sent: " + info.response);
+    }
+  });
 };
 
 main();
