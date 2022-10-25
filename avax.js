@@ -115,12 +115,11 @@ const GoldClaim = async () => {
   // storage array for sending reports
   let report = ["Kingdom Report " + todayDate()];
   const URLs = {
-    AVAX_1: "https://www.avaxkingdom.xyz",
-    MATIC_2: "https://www.matickingdom.xyz",
-    BNB_3: "https://www.kingdomcash.xyz",
-    OP_4: "https://www.optkingdom.xyz",
+    CHAIN_1: "https://www.avaxkingdom.xyz",
+    CHAIN_2: "https://www.matickingdom.xyz",
+    CHAIN_3: "https://www.kingdomcash.xyz",
+    CHAIN_4: "https://www.optkingdom.xyz",
   };
-  report.push(URLs);
 
   // loop through for each chain
   for (const chain of networks) {
@@ -143,11 +142,12 @@ const GoldClaim = async () => {
 
       // succeeded
       const success = {
-        index: chain.index,
-        claimed: gold.toString(),
+        chain: chain.index,
+        gold: gold.toString(),
         withdrawn: result,
         balance: balance,
         contract_tvl: tvl,
+        URL: URLs["CHAIN_" + chain.index],
       };
 
       report.push(success);
