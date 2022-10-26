@@ -149,7 +149,7 @@ const GoldClaim = async () => {
         withdrawn: result,
         balance: balance,
         contract_tvl: tvl,
-        URL: URLs["CHAIN_" + chain.index],
+        url: URLs["CHAIN_" + chain.index],
       };
 
       report.push(success);
