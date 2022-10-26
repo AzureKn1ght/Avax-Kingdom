@@ -1,5 +1,7 @@
 # Kingdom Cash 
-Automatic daily claims bot.  
+Automatic daily claims bot  
+
+[![KINGDOM CASH](http://img.youtube.com/vi/QHhzYdrPgAs/0.jpg)](http://www.youtube.com/watch?v=QHhzYdrPgAs "KINGDOM CASH")
 
 **URLs:** \
 https://www.avaxkingdom.xyz/?p=0xaB951EC23283eE00AE0A575B89dDF40Df28e23Ab \
