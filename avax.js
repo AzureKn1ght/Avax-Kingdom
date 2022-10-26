@@ -9,11 +9,12 @@ https://www.matickingdom.xyz/?p=0xaB951EC23283eE00AE0A575B89dDF40Df28e23Ab
 https://www.kingdomcash.xyz/?p=0xaB951EC23283eE00AE0A575B89dDF40Df28e23Ab
 */
 
-// Import required node modules
+// Import all the required node modules
 const { ethers, BigNumber } = require("ethers");
 const scheduler = require("node-schedule");
 const nodemailer = require("nodemailer");
 const figlet = require("figlet");
+const axios = require("axios");
 const ABI = require("./abi");
 require("dotenv").config();
 const fs = require("fs");
@@ -78,6 +79,7 @@ const connect = async (network) => {
   let connection = {};
 
   // Add connection properties
+  connection.network = network;
   connection.provider = new ethers.providers.JsonRpcProvider(network.rpc);
   connection.wallet = new ethers.Wallet(wallet.key, connection.provider);
   connection.contract = new ethers.Contract(
@@ -126,7 +128,7 @@ const GoldClaim = async () => {
     // start
     try {
       // connect to the current chain
-      const connection = connect(chain);
+      const connection = await connect(chain);
 
       // claim and withdraw out rewards
       const gold = await claimRewards(1, connection);
@@ -181,20 +183,32 @@ const withdrawGold = async (gold, connection) => {
     gold = BigNumber.from(t.money);
   }
 
+  // need to check for polygon gas fees
+  const chain = connection.network.index;
+
   try {
-    // execute the withdrawal transaction
-    const w = await connection.contract.withdrawMoney(gold);
-    const receipt = await w.wait();
+    let withdraw;
+
+    // need to set for polygon gas
+    if (chain === 2) {
+      const est = await connection.contract.estimateGas.withdrawMoney(gold);
+      const override = await calcGas(est);
+
+      withdraw = await connection.contract.withdrawMoney(gold, override);
+    } else {
+      withdraw = await connection.contract.withdrawMoney(gold);
+    }
 
     // wait for transaction to complete
+    const receipt = await withdraw.wait();
     if (receipt) {
       console.log("WITHDRAW SUCCESSFUL");
 
       // get the user wallet AVAX balance
       const b = await connection.provider.getBalance(wallet.address);
       const balance = ethers.utils.formatEther(b);
-      console.log(`Wallet: ${balance} AVAX`);
-      console.log("-----");
+      console.log(`Wallet: ${balance}`);
+      console.log("-----\n");
       return true;
     }
   } catch (error) {
@@ -209,15 +223,22 @@ const claimRewards = async (tries, connection) => {
   try {
     // limit to maximum 3 tries
     if (tries > 3) return false;
-    console.log(`Try #${tries}...`);
+    const chain = connection.network.index;
+    console.log(`Chain ${chain}, Try #${tries}`);
     console.log("Claiming Rewards...");
-    await delay();
+    let claim;
 
-    // execute the claiming transaction
-    const claim = await connection.contract.collectMoney();
-    const receipt = await claim.wait();
+    // need to set for polygon gas
+    if (chain === 2) {
+      const estimate = await connection.contract.estimateGas.collectMoney();
+      const override = await calcGas(estimate);
+      claim = await connection.contract.collectMoney(override);
+    } else {
+      claim = await connection.contract.collectMoney();
+    }
 
     // wait for transaction to complete
+    const receipt = await claim.wait();
     if (receipt) {
       console.log("CLAIM SUCCESSFUL");
 
@@ -233,7 +254,9 @@ const claimRewards = async (tries, connection) => {
     console.error(error);
     console.log("Claim Attempt Failed!");
     console.log("reconnecting...");
-    return await claimRewards(++tries);
+    await delay();
+
+    return await claimRewards(++tries, connection);
   }
 
   return false;
@@ -321,6 +344,32 @@ const sendReport = async (report) => {
       console.log("Email sent: " + info.response);
     }
   });
+};
+
+// Polygon Gas Function
+const calcGas = async (gasEstimated) => {
+  console.log("Calculating gas...");
+  let gas = {
+    gasLimit: gasEstimated.mul(110).div(100),
+    maxFeePerGas: ethers.BigNumber.from(90000000000),
+    maxPriorityFeePerGas: ethers.BigNumber.from(90000000000),
+  };
+  try {
+    const { data } = await axios({
+      method: "get",
+      url: "https://gasstation-mainnet.matic.network/v2",
+    });
+    gas.maxFeePerGas = parse(data.fast.maxFee);
+    gas.maxPriorityFeePerGas = parse(data.fast.maxPriorityFee);
+  } catch (error) {
+    console.error(error);
+  }
+  return gas;
+};
+
+// Gas Helper Function
+const parse = (data) => {
+  return ethers.utils.parseUnits(Math.ceil(data) + "", "gwei");
 };
 
 main();
