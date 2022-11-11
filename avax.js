@@ -1,12 +1,11 @@
 /*
-- Kingdom Cash - 
+- AVAX Kingdom - 
 For automatic daily claims!  
 
 URLs: 
 https://www.avaxkingdom.xyz/?p=0xaB951EC23283eE00AE0A575B89dDF40Df28e23Ab
 https://www.optkingdom.xyz/?p=0xaB951EC23283eE00AE0A575B89dDF40Df28e23Ab
 https://www.matickingdom.xyz/?p=0xaB951EC23283eE00AE0A575B89dDF40Df28e23Ab
-https://www.kingdomcash.xyz/?p=0xaB951EC23283eE00AE0A575B89dDF40Df28e23Ab
 */
 
 // Import all the required node modules
@@ -125,6 +124,9 @@ const GoldClaim = async () => {
 
   // loop through for each chain
   for (const chain of networks) {
+    // KingdomCash (BSC) has rugged
+    if (chain.index === 3) continue;
+
     // start
     try {
       // connect to the current chain
@@ -265,7 +267,7 @@ const claimRewards = async (tries, connection) => {
 // Job Scheduler Function
 const scheduleNext = async (nextDate) => {
   // set next job to be 24hrs from now
-  nextDate.setHours(nextDate.getHours() + 24);
+  nextDate.setHours(nextDate.getHours() + 12);
   claims.nextClaim = nextDate.toString();
   console.log("Next Claim: ", nextDate);
 
