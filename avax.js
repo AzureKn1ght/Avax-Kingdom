@@ -5,7 +5,6 @@ For automatic daily claims!
 URLs: 
 https://www.avaxkingdom.xyz/?p=0xaB951EC23283eE00AE0A575B89dDF40Df28e23Ab
 https://www.optkingdom.xyz/?p=0xaB951EC23283eE00AE0A575B89dDF40Df28e23Ab
-https://www.matickingdom.xyz/?p=0xaB951EC23283eE00AE0A575B89dDF40Df28e23Ab
 */
 
 // Import all the required node modules
@@ -124,8 +123,8 @@ const GoldClaim = async () => {
 
   // loop through for each chain
   for (const chain of networks) {
-    // KingdomCash (BSC) has rugged
-    if (chain.index === 3) continue;
+    // KingdomCash (BSC) and Matic Kingdom has rugged
+    if (chain.index == 3 || chain.index == 2) continue;
 
     // start
     try {
